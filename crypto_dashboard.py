@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
+import os 
 
 st.set_page_config(page_title="Crypto Risk Dashboard", layout="wide")
 
@@ -9,7 +10,13 @@ st.set_page_config(page_title="Crypto Risk Dashboard", layout="wide")
 st_autorefresh(interval=60 * 1000, key="auto_refresh")
 
 # --- Load and clean data ---
+if not os.path.exists("output/crypto_prices.csv"):
+    st.warning("⚠️ No data available yet. Please add `output/crypto_prices.csv` to your repo.")
+    st.stop()
+
 df = pd.read_csv("output/crypto_prices.csv")
+
+
 
 df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
 df['btc'] = pd.to_numeric(df['btc'], errors='coerce')
