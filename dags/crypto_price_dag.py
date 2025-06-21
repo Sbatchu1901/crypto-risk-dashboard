@@ -46,8 +46,9 @@ default_args = {
 with DAG(
     dag_id='crypto_price_dag',
     default_args=default_args,
-    schedule_interval='@daily',
-    catchup=False
+    schedule_interval='*/5 * * * *',  # Every 5 minutes
+    catchup=False,
+    max_active_runs=1
 ) as dag:
 
     task_extract = PythonOperator(

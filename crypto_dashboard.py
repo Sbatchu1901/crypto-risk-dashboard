@@ -29,8 +29,26 @@ df['btc_pct_change'] = df['btc'].pct_change() * 100
 df['eth_pct_change'] = df['eth'].pct_change() * 100
 
 # --- Define risk thresholds ---
-btc_threshold = 5  # ±5% for BTC
-eth_threshold = 3  # ±3% for ETH
+st.sidebar.header("⚙️ Risk Settings")
+btc_threshold = st.sidebar.slider("BTC Risk Threshold (%)", 1, 20, 5)
+eth_threshold = st.sidebar.slider("ETH Risk Threshold (%)", 1, 20, 3)
+
+min_date = df['timestamp'].min().date()
+max_date = df['timestamp'].max().date()
+start_date, end_date = st.sidebar.date_input(
+    "Filter by date range", [min_date, max_date],
+    min_value=min_date, max_value=max_date
+)
+
+# Filter data by selected date range
+df = df[(df['timestamp'].dt.date >= start_date) & (df['timestamp'].dt.date <= end_date)]
+
+
+if df.empty:
+    st.warning("⚠️ No data available for the selected date range.")
+    st.stop()
+
+st.caption(f"📅 Showing data from **{start_date}** to **{end_date}**")
 
 latest_time = df['timestamp'].iloc[-1].strftime('%Y-%m-%d %H:%M')
 btc_change = df['btc_pct_change'].iloc[-1]
@@ -39,8 +57,12 @@ eth_change = df['eth_pct_change'].iloc[-1]
 btc_risk = abs(btc_change) > btc_threshold
 eth_risk = abs(eth_change) > eth_threshold
 
+
 # --- Streamlit UI setup ---
 st.title("🛡️ Crypto Risk Dashboard")
+st.subheader("📊 Live Price Snapshot")
+st.write(f"🪙 **Bitcoin**: ${df['btc'].iloc[-1]:,.2f}")
+st.write(f"🪙 **Ethereum**: ${df['eth'].iloc[-1]:,.2f}")
 
 # --- Alert banner ---
 if btc_risk or eth_risk:
@@ -103,6 +125,17 @@ else:
 # --- Historical High-Risk Events ---
 st.subheader("📋 Historical High-Risk Events")
 st.dataframe(risk_df[['timestamp', 'btc_pct_change', 'eth_pct_change']], use_container_width=True)
+
+st.download_button(
+    label="📥 Download Full Data as CSV",
+    data=df.to_csv(index=False).encode('utf-8'),
+    file_name='crypto_price_data.csv',
+    mime='text/csv',
+)
+if st.checkbox("Show raw data"):
+    st.subheader("📄 Raw Data Table")
+    st.dataframe(df, use_container_width=True)
+
 
 # Footer
 st.caption("Powered by Airflow + Streamlit + CoinGecko")
