@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import os 
+import pytz
 
 st.set_page_config(page_title="Crypto Risk Dashboard", layout="wide")
 
@@ -19,6 +20,9 @@ df = pd.read_csv("output/crypto_prices.csv")
 
 
 df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+eastern = pytz.timezone("US/Eastern")
+df['timestamp'] = df['timestamp'].dt.tz_localize('UTC').dt.tz_convert(eastern)
+
 df['btc'] = pd.to_numeric(df['btc'], errors='coerce')
 df['eth'] = pd.to_numeric(df['eth'], errors='coerce')
 df = df.dropna(subset=['timestamp', 'btc', 'eth'])
@@ -50,7 +54,8 @@ if df.empty:
 
 st.caption(f"📅 Showing data from **{start_date}** to **{end_date}**")
 
-latest_time = df['timestamp'].iloc[-1].strftime('%Y-%m-%d %H:%M')
+latest_time = df['timestamp'].iloc[-1].strftime('%Y-%m-%d %I:%M %p %Z')
+
 btc_change = df['btc_pct_change'].iloc[-1]
 eth_change = df['eth_pct_change'].iloc[-1]
 
