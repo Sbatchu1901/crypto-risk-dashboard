@@ -17,7 +17,7 @@ def extract_prices():
     data = response.json()
     # Save to file temporarily so the next task can use it
     with open('/opt/airflow/crypto_prices.json', 'w') as f:
-    json.dump(data, f)  # ✅ Correct: writes valid JSON
+        json.dump(data, f)  # ✅ Correct: writes valid JSON
 
 # 2. Save to CSV
 def save_to_csv():
