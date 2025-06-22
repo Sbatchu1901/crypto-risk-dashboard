@@ -6,7 +6,6 @@ import pytz
 
 st.set_page_config(page_title="Crypto Risk Dashboard", layout="wide")
 
-
 # 🔄 Auto-refresh every 60 seconds
 st_autorefresh(interval=60 * 1000, key="auto_refresh")
 
@@ -16,8 +15,6 @@ if not os.path.exists("output/crypto_prices.csv"):
     st.stop()
 
 df = pd.read_csv("output/crypto_prices.csv")
-
-
 
 df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
 eastern = pytz.timezone("US/Eastern")
@@ -47,27 +44,32 @@ start_date, end_date = st.sidebar.date_input(
 # Filter data by selected date range
 df = df[(df['timestamp'].dt.date >= start_date) & (df['timestamp'].dt.date <= end_date)]
 
-
 if df.empty:
     st.warning("⚠️ No data available for the selected date range.")
     st.stop()
 
 st.caption(f"📅 Showing data from **{start_date}** to **{end_date}**")
 
-latest_time = df['timestamp'].iloc[-1].strftime('%Y-%m-%d %I:%M %p %Z')
-
+# --- Risk evaluation ---
 btc_change = df['btc_pct_change'].iloc[-1]
 eth_change = df['eth_pct_change'].iloc[-1]
 
 btc_risk = abs(btc_change) > btc_threshold
 eth_risk = abs(eth_change) > eth_threshold
 
-
 # --- Streamlit UI setup ---
 st.title("🛡️ Crypto Risk Dashboard")
+
+# --- Live Snapshot with Timestamp ---
+latest_row = df.iloc[-1]
+btc_price = latest_row["btc"]
+eth_price = latest_row["eth"]
+latest_time = latest_row["timestamp"].strftime('%Y-%m-%d %I:%M %p %Z')
+
 st.subheader("📊 Live Price Snapshot")
-st.write(f"🪙 **Bitcoin**: ${df['btc'].iloc[-1]:,.2f}")
-st.write(f"🪙 **Ethereum**: ${df['eth'].iloc[-1]:,.2f}")
+st.write(f"🕒 **Latest Data Timestamp:** `{latest_time}`")
+st.write(f"🪙 **Bitcoin**: ${btc_price:,.2f}")
+st.write(f"🪙 **Ethereum**: ${eth_price:,.2f}")
 
 # --- Alert banner ---
 if btc_risk or eth_risk:
@@ -104,25 +106,25 @@ risk_df = df[
 # --- Trend charts ---
 st.subheader("📈 Bitcoin & Ethereum Price Trends")
 
-if not risk_df.empty:
+show_all = st.checkbox("🔍 Show full trend (instead of just high-risk)", value=risk_df.empty)
+
+if not risk_df.empty and not show_all:
     st.markdown("🔴 Showing only high-risk periods")
 
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("**Bitcoin (BTC) – High-Risk Only**")
         st.line_chart(risk_df.set_index('timestamp')[['btc']])
-
     with col2:
         st.markdown("**Ethereum (ETH) – High-Risk Only**")
         st.line_chart(risk_df.set_index('timestamp')[['eth']])
 else:
-    st.markdown("🟢 No high-risk detected. Showing full price trends")
+    st.markdown("📊 Showing full price trends")
 
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("**Bitcoin (BTC) – Full Data**")
         st.line_chart(df.set_index('timestamp')[['btc']])
-
     with col2:
         st.markdown("**Ethereum (ETH) – Full Data**")
         st.line_chart(df.set_index('timestamp')[['eth']])
@@ -131,16 +133,17 @@ else:
 st.subheader("📋 Historical High-Risk Events")
 st.dataframe(risk_df[['timestamp', 'btc_pct_change', 'eth_pct_change']], use_container_width=True)
 
+# --- Download & Raw Data ---
 st.download_button(
     label="📥 Download Full Data as CSV",
     data=df.to_csv(index=False).encode('utf-8'),
     file_name='crypto_price_data.csv',
     mime='text/csv',
 )
+
 if st.checkbox("Show raw data"):
     st.subheader("📄 Raw Data Table")
     st.dataframe(df, use_container_width=True)
-
 
 # Footer
 st.caption("Powered by Airflow + Streamlit + CoinGecko")
