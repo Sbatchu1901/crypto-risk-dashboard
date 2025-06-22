@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import requests
 import pandas as pd
 import os 
+import json 
 
 # 1. Extract prices
 def extract_prices():
@@ -16,23 +17,25 @@ def extract_prices():
     data = response.json()
     # Save to file temporarily so the next task can use it
     with open('/opt/airflow/crypto_prices.json', 'w') as f:
-        f.write(str(data))
+    json.dump(data, f)  # ✅ Correct: writes valid JSON
 
 # 2. Save to CSV
 def save_to_csv():
     import json
     with open('/opt/airflow/crypto_prices.json', 'r') as f:
         raw = f.read()
-        data = json.loads(raw.replace("'", '"'))  # safely parse to dict
+        data = json.load(f)  # ✅ Directly parse valid JSON
 
     # Extract prices into structured DataFrame
     df = pd.DataFrame({
         'btc': [data['bitcoin']['usd']],
         'eth': [data['ethereum']['usd']],
-        'timestamp': [datetime.now().isoformat()]
+        'timestamp': [context['ts']]
     })
 
     df.to_csv('/opt/airflow/output/crypto_prices.csv', mode='a', header=not os.path.exists('/opt/airflow/output/crypto_prices.csv'), index=False)
+    print("Fetched data:", data)
+    print("DataFrame to write:\n", df)
 
 
 
