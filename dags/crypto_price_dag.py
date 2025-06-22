@@ -3,10 +3,11 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 import requests
 import pandas as pd
-import os 
-import json 
+import os
+import json
+import logging
 
-# 1. Extract prices
+# 1. Extract prices and save to JSON
 def extract_prices():
     url = 'https://api.coingecko.com/api/v3/simple/price'
     params = {
@@ -15,30 +16,33 @@ def extract_prices():
     }
     response = requests.get(url, params=params)
     data = response.json()
-    # Save to file temporarily so the next task can use it
-    with open('/opt/airflow/crypto_prices.json', 'w') as f:
-        json.dump(data, f)  # ✅ Correct: writes valid JSON
+    if 'bitcoin' in data and 'ethereum' in data:
+        with open('/opt/airflow/crypto_prices.json', 'w') as f:
+            json.dump(data, f)
+        logging.info("Data extracted and saved to JSON: %s", data)
+    else:
+        raise ValueError("Received invalid or empty data from API")
 
-# 2. Save to CSV
-def save_to_csv():
-    import json
+# 2. Save data to CSV with timestamp
+def save_to_csv(**kwargs):
+    execution_time = kwargs['ts']  # Get execution timestamp
+
     with open('/opt/airflow/crypto_prices.json', 'r') as f:
-        raw = f.read()
-        data = json.load(f)  # ✅ Directly parse valid JSON
+        data = json.load(f)
 
-    # Extract prices into structured DataFrame
     df = pd.DataFrame({
         'btc': [data['bitcoin']['usd']],
         'eth': [data['ethereum']['usd']],
-        'timestamp': [context['ts']]
+        'timestamp': [execution_time]
     })
 
-    df.to_csv('/opt/airflow/output/crypto_prices.csv', mode='a', header=not os.path.exists('/opt/airflow/output/crypto_prices.csv'), index=False)
-    print("Fetched data:", data)
-    print("DataFrame to write:\n", df)
+    output_path = '/opt/airflow/output/crypto_prices.csv'
+    df.to_csv(output_path, mode='a', header=not os.path.exists(output_path), index=False)
+
+    logging.info("Data written to CSV:\n%s", df)
 
 
-
+# DAG configuration
 default_args = {
     'owner': 'airflow',
     'start_date': datetime(2024, 1, 1),
@@ -51,19 +55,22 @@ with DAG(
     default_args=default_args,
     schedule_interval='*/5 * * * *',  # Every 5 minutes
     catchup=False,
-    max_active_runs=1
+    max_active_runs=1,
+    tags=['crypto', 'price']
 ) as dag:
 
+    # Task 1: Extract data from API
     task_extract = PythonOperator(
         task_id='extract_prices',
         python_callable=extract_prices
     )
 
+    # Task 2: Save extracted data to CSV
     task_save = PythonOperator(
         task_id='save_to_csv',
-        python_callable=save_to_csv
+        python_callable=save_to_csv,
+        provide_context=True  # ✅ Required to access context like 'ts'
     )
 
+    # Set task order
     task_extract >> task_save
-
-    
